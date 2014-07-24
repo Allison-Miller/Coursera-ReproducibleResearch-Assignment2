@@ -1,28 +1,25 @@
 Health and Economic Impact of Major Storm Events in the USA: 1996 to 2011
 ========================================================
-Allison Miller
+Allison Miller  
 July 2014
 
 
-# Synopsis
-This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage. The NOAA has maintained this database of storm events since 1950. This analysis will investigate the costs (both in dollar terms and human terms) of these storm events. Although the data goes as far back as 1950, it wasn't until 1996 that the NOAA created a list of standardised events.  Events previous to 1996 were classed into fewer types, and even after 1996 many reports of storm events did not stick to the official list of events.  For the purposes of this analysis, we will stick to the more coherent event list from 1996 onwards to build a picture of the most common causes of storm related costs.
+## Synopsis
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property/crop damage. The NOAA has maintained this database of storm events since 1950. This analysis will investigate the costs (both in dollar terms and human terms) of these storm events. Although the data goes as far back as 1950, it wasn't until 1996 that the NOAA created a list of 48 standardised event types.  Events previous to 1996 were classed into fewer types, and even after 1996 many reports of storm events did not stick to the official list of events.  For the purposes of this analysis, we will stick to the more coherent event list using the data from 1996 onwards to build a picture of the most common causes of storm related costs.
 
-#Data Processing
+## Data Processing
+
+Processing and analysis of the data was all done using the R statistical package.   
 
 The data can be downloaded from https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2 and then read into R:  Initially we will read in just the first line and header of the file to get a feel for the data structure:
 
 ```r
-url = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
-StormData = "./StormData.csv.bz2"
-if (!file.exists(StormData)) {
-    download.file(url, StormData)
-}
-stormData=read.csv("StormData.csv.bz2", header=T, nrow=1)
+stormDataHeader=read.csv("StormData.csv.bz2", header=T, nrow=1)
 ```
 Let's look at the structure of the data in more detail:
 
 ```r
-str(stormData)
+str(stormDataHeader)
 ```
 
 ```
@@ -65,23 +62,23 @@ str(stormData)
 ##  $ REMARKS   : logi NA
 ##  $ REFNUM    : num 1
 ```
-For this analysis, we are only interested in the following:
+So there are 37 variables in the data. For this analysis, we will only read in the following as defined here:
+http://ire.org/media/uploads/files/datalibrary/samplefiles/Storm%20Events/layout08.doc
 
-BGN_DATE (Date of beginning of storm, currently a factor)   
-STATE (State abbreviation as a factor)  
-EVTYPE (Type of event, currently a factor, make it a character)  
-FATALITIES (Number of fatalities, numeric)  
-INJURIES (number of injuries, numeric)  
-PROPDMG (Property damage, numeric, needs adjusting with PROPDMGEXP to get actual cost)  
-PROPDMGEXP (Abbreviation, make into character, telling us how much to multiply the PROPDMG variable by to get actual cost)  
-CROPDMG (Crop damage, numeric, needs adjusting with CROPDMGEXP to get actual cost)  
-CROPDMGEXP (Abbreviation, make into charatcer, telling us how much to multiply the CROPDMG variable by to get actual cost)  
-REFNUM (Number unique for each event, numeric)  
+*BGN_DATE: Date the storm event began. Currently a factor    
+*STATE: State abbreviation and postal code. Currently a factor, read as a character.  
+*EVTYPE: Type of storm event. Take note that similar storm events can be listed using different wording e.g. 'coastal flood' and 'coastal flooding'. Take note of this if you want to run a query grouping by event type. Currently a factor.  
+*FATALITIES: Number directly killed. Currently numeric.      
+*INJURIES: Number directly injured.Currently numeric.      
+*PROPDMG: Property damage in whole numbers and hundredths. Currently numeric. Needs adjusting with PROPDMGEXP to get actual cost ($US).      
+*PROPDMGEXP: A multiplier where Hundred (H), Thousand (K), Million (M), Billion (B), read as a character, telling us how much to multiply the PROPDMG variable by to get actual cost ($US).    
+*CROPDMG: Crop damage in whole numbers and hundredths. Currently numeric, needs adjusting with CROPDMGEXP to get actual cost ($US).    
+*CROPDMGEXP:  A multiplier where Hundred (H), Thousand (K), Million (M), Billion (B),currently a factor, read in as character, telling us how much to multiply the CROPDMG variable by to get actual cost($US).   
 
-Detailed information about all the variables can be found here:  
-http://ire.org/media/uploads/files/datalibrary/samplefiles/Storm%20Events/storms.xls
+Detailed information about many of the variables can be found here:  
+https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
 
-The main ducumentaion can be found here:  
+The main ducumentation can be found here:  
 http://ire.org/media/uploads/files/datalibrary/samplefiles/Storm%20Events/readme_08.doc
 
 So let's read all rows of the data in, ignoring variables that we are not interested in, while changing the remaining variables to suit the analysis:
@@ -111,16 +108,21 @@ str(stormData)
 ##  $ LONGITUDE : num  8812 8755 8742 8626 8642 ...
 ##  $ REFNUM    : num  1 2 3 4 5 6 7 8 9 10 ...
 ```
-Now let's do our first filtering to look only at events that have happened since 1996, First we set the BGN_DATE field to date format, then filter by year:
+So we have 902297 observations of just the 12 variables of potential interest in this analysis. Now let's do our first filtering to look only at events that have happened since 1996, First we set the BGN_DATE field to date format, then filter by year:
 
 ```r
 stormData$BGN_DATE=as.Date(stormData$BGN_DATE, format = "%m/%d/%Y")
 after1995 = stormData[(stormData$BGN_DATE >= "1996-01-01"), ]
+str(after1995$BGN_DATE)
 ```
-Now that we have all the variables we need for the years we are interested, we will remove the stormData file to free up memory for the rest of the analysis.  From here on we'll just use the after1995 data set:
+
+```
+##  Date[1:653530], format: "1996-01-06" "1996-01-11" "1996-01-11" "1996-01-11" ...
+```
+Now that we have all the variables we need for the years we are interested, from here on we'll just use the after1995 data set:
 
 ```r
-remove(stormData)
+rm(stormData)
 dim(after1995)
 ```
 
@@ -129,7 +131,7 @@ dim(after1995)
 ```
 This leaves us with 653530 events after 1995 to work with.  
 
-# Processing data to look at economic costs
+## Processing data to look at economic costs
 
 We are interested in both economic and human costs of storm events.  We'll deal with the economic costs first, then the human costs.
 
@@ -150,7 +152,7 @@ unique(after1995$CROPDMGEXP)
 ```
 ## [1] "K" ""  "M" "B"
 ```
-According to the documentation of this dataset, "K" means thousand US dollars or 1e+03, "M" means million US dollars, or 1e+06, and "B" means billion US dollars, or 1e+09.  So we will create a variable to convert these characters to their numeric dollar value as follows:
+According to the documentation of this dataset, "K" means Thousand US dollars or 1e+03, "M" means million US dollars, or 1e+06, and "B" means billion US dollars, or 1e+09.  So we will create a variable to convert these characters to their numeric dollar value.  There are many events that have no dollar amount entered, and we will assume these are basically zero:  
 
 
 ```r
@@ -171,13 +173,13 @@ after1995$totalPropDamage <- after1995$PROPDMG * after1995$propDamage
 after1995$totalCropDamage <- after1995$CROPDMG * after1995$cropDamage
 ```
 
-For the purposes of this analysis, we will only look at the total costs to property and crops, by adding the two together into the variable we will use for the rest of this analysis (CombinedCost):
+For the purposes of this analysis, we will only look at the total costs to property and crops combined, by adding the two together into the variable we will use for the rest of this analysis (CombinedCost):
 
 
 ```r
 after1995$CombinedCost=after1995$totalPropDamage + after1995$totalCropDamage
 ```
-As an exploratory look, let's see what the total cost of storm events to property and crops since 1996 is (after removing anything tha is not applicable, NA):
+As an exploratory look, let's see what the total cost of storm events to property and crops since 1996 is (after removing anything not applicable, NA):
 
 ```r
 sum(after1995$CombinedCost, na.rm=T)
@@ -186,7 +188,7 @@ sum(after1995$CombinedCost, na.rm=T)
 ```
 ## [1] 4.015e+11
 ```
-That's over 400 billion US dollars!
+That's over 400 billion (presumably $US) dollars!
 Let's look at costs by event type to see what the most costly type of events are:
 
 
@@ -390,9 +392,25 @@ length(unique(correctAggDamage$EVTYPE))
 ```
 So we have narrowed down almost 100% of the damage costs from storm events to 28 types.
 
-# Processing data to look at human costs
+## Processing data to look at human costs
 
-A completely different way to look at the costs of major storm events is to look at the human costs in terms of fatalities and injuries.  Both of these values are found in our after1995 data set, in the columns labeled "FATALITIES" and "INJURIES".  We will take a similar approach as we did for economic costs to work out which events cost the most in human terms.  For this, I will simply sum  the number of fatalities and injuries per event in a new column called InjFatalCombined:
+A completely different way to look at the costs of major storm events is to look at the human costs in terms of fatalities and injuries.  Both of these values are found in our after1995 data set, in the columns labeled "FATALITIES" and "INJURIES".  We will take a similar approach as we did for economic costs to work out which events cost the most in human terms.  Let's first look to see if there is any correlation between the number of fatalities and injuries in an event.
+
+```r
+cor(after1995$FATALITIES, after1995$INJURIES)
+```
+
+```
+## [1] 0.4262
+```
+
+```r
+qqplot(after1995$FATALITIES, after1995$INJURIES)
+```
+
+![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24.png) 
+
+The correlation is not perfectly linear, but is moderately positive. Given the moderate correaltion, I will simplify the analysis by summing  the number of fatalities and injuries per event in a new column called InjFatalCombined:
 
 
 ```r
@@ -520,7 +538,7 @@ InjFatalTop50$EVTYPE=mapvalues(InjFatalTop50$EVTYPE, from = c("urban/sml stream 
 InjFatalTop50$EVTYPE=mapvalues(InjFatalTop50$EVTYPE, from = c("wild/forest fire"), to = c("wildfire"))
 InjFatalTop50$EVTYPE=mapvalues(InjFatalTop50$EVTYPE, from = c("winter weather mix", "winter weather/mix", "wintry mix"), to = c("winter weather","winter weather","winter weather"))
 ```
-Now re-check the validity of the evnt types:
+Now re-check the validity of the event types:
 
 ```r
 InjFatalTop50$matched=(InjFatalTop50$EVTYPE%in% legitEvtype$EVTYPE)
@@ -577,7 +595,7 @@ length(unique(correctAggInj$EVTYPE))
 ```
 This leaves us with 33 event types contributing to over 99% of injuries and fatalities.
 
-# Results
+## Results
 
 In both the economic costs and human costs, there are still a lot of event types.  To narrow down our analysis, I will calculate the percent of costs or injuries/fatalities for each of the top 50 events.  I will then plot all those that contribute to 2% or more of the total.  This should give us a good idea of what the most costly events are.
 
@@ -626,7 +644,6 @@ BiggestDamageEvents
 ## 26            wildfire    8.163e+09       2
 ```
 
-
 Let's plot all 10 of these events, showing damage in dollar values as well as percent of cost:
 
 
@@ -644,7 +661,7 @@ ggplot(data=BiggestDamageEvents, aes(y=CombinedCost,x=toupper(EVTYPE)))+
           title=element_text(size=15, colour="#990000"))
 ```
 
-![plot of chunk unnamed-chunk-34](figure/unnamed-chunk-34.png) 
+![plot of chunk unnamed-chunk-35](figure/unnamed-chunk-35.png) 
 
 
 Now let's look at the top events causing injuries or fatalities, by percentage:
@@ -711,8 +728,8 @@ ggplot(data=BiggestInjFatalEvents, aes(y=InjFatalCombined,x=toupper(EVTYPE)))+
           title=element_text(size=15, colour="#990000"))
 ```
 
-![plot of chunk unnamed-chunk-38](figure/unnamed-chunk-38.png) 
-# Discussion
+![plot of chunk unnamed-chunk-39](figure/unnamed-chunk-39.png) 
+## Discussion
 
 The justification for limiting this analysis to 1996 onwards come froms the NOAA database details here:
 http://www.ncdc.noaa.gov/stormevents/details.jsp
@@ -723,12 +740,27 @@ According to this analysis, The most economically costly types of storm events a
 
 In terms of injuries and fatalities, tornados, excessive heat and floods are the most costly, with thunderstorm winds, lightning,	flash floods, wildfires, winter storms,	heat, high wind, hurricanes (typhoons) and rip currents also being significant sources of morbidity and mortality.  
 
-However, it would be premature to try and draw any conclusions from this analysis. Though this analysis should have captured more than 99% of most of the recorded costs, injuries and fatalities, it is limited in many ways.  The coding of the events was often not followed rigourously, and some of the re-coding decisions used in the analysis may have been faulty. The data itself is very untidy, and there are no doubt many errors that have not been filtered out by this brief analysis. For instance, the wrong coding of even one crop or property damage exponent from a K or M to a B would throw out the entire analysis. Likewise some events may have been recorded more than once.  
+However, it would be premature to try and draw any conclusions from this analysis. Though this analysis should have captured more than 99% of most of the recorded costs, injuries and fatalities, it is limited in many ways.  The coding of the events was often not followed rigourously, and some of the re-coding decisions used in the analysis may have been faulty. The data itself is very untidy, and there are no doubt many errors that have not been filtered out by this brief analysis. The wrong coding of even one crop or property damage exponent from a K or M to a B would throw out the entire analysis. For instance, the data shows there was a flood in California in 2006 that caused over a 100 billion dollars in property damage.  This is likely to be an error coding millions (M) as billions (B), and would thus make hurricanes/typhoons the most economically damaging storm event type. Likewise some events may have been recorded more than once.  
 
-It would also be interesting to look at a breakdown of economic costs by property damage versus crop damage, and likewise to compare fatalities to injuries when considering the human cost of these types of events.  Another thing that might be worth considering is to look at inflation adjusted figures in the economic analysis. Other ways worth looking at the data might be by year, especally if wanting to see climate change impacts. From a civil defence planning point of view, it would also be good to analyse the event types by region, as the types of storm events in any particular region may be heavily influenced by geography.  Local planning for storm events would ideally have data on the likelyhood of different types of events in a particular region. The original data set has categories to help with this kind of mapping to various degrees, such as state, county, longitude and latitude.
+It would also be interesting to look at a breakdown of economic costs by property damage versus crop damage, and likewise to compare fatalities to injuries separately when considering the human cost of these types of events.  Another thing that might be worth considering is to look at inflation adjusted figures in the economic analysis. Other ways worth looking at the data might be by year, especally if wanting to see climate change impacts. From a civil defence planning point of view, it would also be good to analyse the event types by region, as the types of storm events in any particular region may be heavily influenced by geography.  Local planning for storm events would ideally have data on the likelyhood of different types of events in a particular region. The original data set has categories to help with this kind of mapping to various degrees, such as state, county, longitude and latitude.
 
+## References
 
-# Session information
+1. NCDC Storm Events Database Details  
+http://www.ncdc.noaa.gov/stormevents/details.jsp  
+
+2. Investigative Reporters and Editors Data Library for Storm Events-Layout 
+http://ire.org/media/uploads/files/datalibrary/samplefiles/Storm%20Events/layout08.doc
+
+3. Investigative Reporters and Editors Data Library for Storm Events-Readme  
+http://ire.org/media/uploads/files/datalibrary/samplefiles/Storm%20Events/readme_08.doc 
+
+## Note
+
+The event official event type csv and other files for this analysis can be found at:  
+https://github.com/Allison-Miller/Coursera_ReproducibleResearch_Assignment2
+
+## Session information
 
 
 
